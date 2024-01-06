@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 )
@@ -48,10 +49,19 @@ func mergeTextFiles(outputPrefix string) error {
 
 func sortFilesByNumber(files []string) {
 	sort.Slice(files, func(i, j int) bool {
-		numI, _ := strconv.Atoi(filepath.Base(files[i][:len(files[i])-4]))
-		numJ, _ := strconv.Atoi(filepath.Base(files[j][:len(files[j])-4]))
+		numI, _ := extractNumber(files[i])
+		numJ, _ := extractNumber(files[j])
 		return numI < numJ
 	})
+}
+
+func extractNumber(fileName string) (int, error) {
+	re := regexp.MustCompile(`(\d+)`)
+	match := re.FindStringSubmatch(filepath.Base(fileName))
+	if len(match) < 2 {
+		return 0, fmt.Errorf("failed to extract number from filename: %s", fileName)
+	}
+	return strconv.Atoi(match[1])
 }
 
 func mergeFiles(output io.Writer, filePath string) error {
