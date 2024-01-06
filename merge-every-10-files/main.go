@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-const batchSize = 5
+const batchSize = 10
 
 func mergeTextFiles(outputPrefix string) error {
 	files, err := filepath.Glob("*.txt")
