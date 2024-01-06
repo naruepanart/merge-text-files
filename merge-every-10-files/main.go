@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -30,18 +31,20 @@ func mergeTextFiles(outputPrefix string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %v", err)
 		}
-		defer outFile.Close()
 
 		fmt.Printf("Merging batch %d into %s\n", batchCount, outputFile)
 
 		for j := i; j < i+batchSize && j < len(files); j++ {
 			file := files[j]
-			if err := mergeFiles(outFile, file); err != nil {
+			if err := mergeFilesWithBuffer(outFile, file); err != nil {
+				outFile.Close()
 				return err
 			}
 		}
 
 		fmt.Println("Merge successful. Output file:", outputFile)
+
+		outFile.Close()
 	}
 
 	return nil
@@ -64,7 +67,7 @@ func extractNumber(fileName string) (int, error) {
 	return strconv.Atoi(match[1])
 }
 
-func mergeFiles(output io.Writer, filePath string) error {
+func mergeFilesWithBuffer(output io.Writer, filePath string) error {
 	fmt.Println("Processing file:", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -72,8 +75,15 @@ func mergeFiles(output io.Writer, filePath string) error {
 	}
 	defer file.Close()
 
-	_, err = io.Copy(output, file)
-	return err
+	buffer := make([]byte, 4096) // Adjust the buffer size as needed
+	writer := bufio.NewWriter(output)
+
+	_, err = io.CopyBuffer(writer, file, buffer)
+	if err != nil {
+		return fmt.Errorf("failed to copy buffer: %v", err)
+	}
+
+	return writer.Flush()
 }
 
 func main() {
