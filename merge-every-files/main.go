@@ -1,62 +1,70 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 )
 
-func mergeTextFiles(outputFile string) error {
+const bufferSize = 4096 // Adjust buffer size as needed
+
+func main() {
+	outputFile := "merged.txt"
+
 	files, err := filepath.Glob("*.txt")
 	if err != nil {
-		return fmt.Errorf("failed to retrieve files: %v", err)
+		fmt.Println("Error:", err)
+		return
 	}
 
-	sortFilesByNumber(files)
+	sort.Slice(files, func(i, j int) bool {
+		numI, _ := extractNumber(files[i])
+		numJ, _ := extractNumber(files[j])
+		return numI < numJ
+	})
 
 	outFile, err := os.Create(outputFile)
 	if err != nil {
-		return fmt.Errorf("failed to create output file: %v", err)
+		fmt.Println("Error:", err)
+		return
 	}
 	defer outFile.Close()
 
 	for _, file := range files {
 		fmt.Println("Processing:", file)
-		if err := mergeFiles(outFile, file); err != nil {
-			return err
+		srcFile, err := os.Open(file)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		defer srcFile.Close()
+
+		reader := bufio.NewReaderSize(srcFile, bufferSize)
+		writer := bufio.NewWriterSize(outFile, bufferSize)
+
+		if _, err := io.Copy(writer, reader); err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		if err := writer.Flush(); err != nil {
+			fmt.Println("Error:", err)
+			return
 		}
 	}
 
 	fmt.Println("Merge successful. Output file:", outputFile)
-	return nil
 }
 
-func sortFilesByNumber(files []string) {
-	sort.Slice(files, func(i, j int) bool {
-		numI, _ := strconv.Atoi(filepath.Base(files[i][:len(files[i])-4]))
-		numJ, _ := strconv.Atoi(filepath.Base(files[j][:len(files[j])-4]))
-		return numI < numJ
-	})
-}
-
-func mergeFiles(output io.Writer, filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to open file %s: %v", filePath, err)
+func extractNumber(fileName string) (int, error) {
+	match := regexp.MustCompile(`(\d+)`).FindStringSubmatch(filepath.Base(fileName))
+	if len(match) < 2 {
+		return 0, fmt.Errorf("failed to extract number from filename: %s", fileName)
 	}
-	defer file.Close()
-
-	_, err = io.Copy(output, file)
-	return err
-}
-
-func main() {
-	outputFile := "merged.txt"
-
-	if err := mergeTextFiles(outputFile); err != nil {
-		fmt.Println("Error:", err)
-	}
+	return strconv.Atoi(match[1])
 }
